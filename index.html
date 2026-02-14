@@ -1,1 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OMI AUDIT ADMIN APP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; }
+        .patient-card { cursor: pointer; border-radius: 20px; transition: 0.2s; border: 1px solid #f1f5f9; }
+        .status-yellow { border-left: 6px solid #fbbf24; background-color: #fffbeb; }
+        .status-green { border-left: 6px solid #22c55e; background-color: #f0fdf4; }
+        .modal-up { animation: slideUp 0.3s ease-out; border-radius: 30px 30px 0 0; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .nav-tab { flex: 1; text-align: center; padding: 12px; font-weight: bold; font-size: 12px; color: #64748b; }
+        .nav-tab.active { color: #2563eb; border-bottom: 3px solid #2563eb; }
+    </style>
+</head>
+<body class="bg-slate-50">
 
+    <div id="loginPage" class="flex items-center justify-center min-h-screen bg-slate-900 p-6">
+        <div class="bg-white p-8 rounded-[32px] shadow-2xl w-full max-w-sm">
+            <h1 class="text-2xl font-black text-center mb-8 italic text-slate-800">OMI AUDIT PRO</h1>
+            <input type="text" id="userID" placeholder="Username" class="w-full p-4 mb-4 bg-slate-50 rounded-2xl outline-none border">
+            <input type="password" id="userPass" placeholder="Password" class="w-full p-4 mb-6 bg-slate-50 rounded-2xl outline-none border">
+            <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg">Sign In</button>
+        </div>
+    </div>
+
+    <div id="mainPage" class="hidden pb-24">
+        <header class="bg-white p-5 sticky top-0 z-40 shadow-sm">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h2 id="userDisplay" class="text-xl font-black text-slate-800">Dashboard</h2>
+                    <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest">OMI Hospital Audit</p>
+                </div>
+                <div class="flex gap-2">
+                    <div class="bg-blue-600 px-3 py-1.5 rounded-xl text-center shadow-md">
+                        <p class="text-[8px] text-white opacity-70">TOTAL</p>
+                        <p id="countTotal" class="text-sm font-black text-white leading-none">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="adminNav" class="hidden flex border-b -mx-5 mt-2">
+                <div onclick="switchTab('data')" id="tabData" class="nav-tab active">DATA</div>
+                <div onclick="switchTab('users')" id="tabUsers" class="nav-tab">MANAGE USERS</div>
+            </div>
+        </header>
+
+        <div id="dataView" class="p-4">
+            <input type="text" id="search" onkeyup="render()" placeholder="Search..." class="w-full p-3 bg-white border rounded-2xl mb-4 outline-none text-sm">
+            <div id="cardsContainer" class="space-y-4"></div>
+        </div>
+
+        <div id="usersView" class="hidden p-4">
+            <div class="bg-white p-6 rounded-3xl shadow-sm border mb-6">
+                <h3 class="font-bold mb-4">Create New User</h3>
+                <input type="text" id="regUser" placeholder="Username" class="w-full p-3 bg-slate-50 rounded-xl mb-3 border">
+                <input type="text" id="regPass" placeholder="Password" class="w-full p-3 bg-slate-50 rounded-xl mb-4 border">
+                <button onclick="createNewUser()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold">Add User</button>
+            </div>
+            <div id="userListContainer" class="space-y-3">
+                </div>
+        </div>
+
+        <button onclick="openAddModal()" class="fixed bottom-6 right-6 bg-blue-600 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl z-40">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+
+    <div id="detailModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end justify-center">
+        <div class="bg-white w-full h-[85vh] modal-up p-6 overflow-y-auto" id="modalContent"></div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB60b1DuLBjAHRXV0SqE6U0vf1aTD0UtZ8",
+            authDomain: "omi-patient-portal-750f3.firebaseapp.com",
+            projectId: "omi-patient-portal-750f3",
+            databaseURL: "https://omi-patient-portal-750f3-default-rtdb.firebaseio.com"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        let allData = [];
+        let currentUser = "";
+
+        // LOGIN WITH FIREBASE USERS
+        function login() {
+            const u = document.getElementById('userID').value.toLowerCase().trim();
+            const p = document.getElementById('userPass').value;
+
+            // Pre-defined Admin
+            if (u === 'owner' && p === '1234') {
+                proceedLogin('OWNER', true);
+                return;
+            }
+
+            db.ref('app_users/' + u).once('value', snap => {
+                const userData = snap.val();
+                if (userData && userData.password === p) {
+                    proceedLogin(u, u === 'muneeb');
+                } else {
+                    alert("Ghalat Login Details!");
+                }
+            });
+        }
+
+        function proceedLogin(name, isAdmin) {
+            currentUser = name;
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('mainPage').classList.remove('hidden');
+            document.getElementById('userDisplay').innerText = "Hi, " + name.toUpperCase();
+            if(isAdmin || name === 'OWNER') {
+                document.getElementById('adminNav').classList.remove('hidden');
+            }
+            initSync();
+            if(isAdmin || name === 'OWNER') syncUsers();
+        }
+
+        // TAB SWITCHING
+        function switchTab(tab) {
+            if(tab === 'data') {
+                document.getElementById('dataView').classList.remove('hidden');
+                document.getElementById('usersView').classList.add('hidden');
+                document.getElementById('tabData').classList.add('active');
+                document.getElementById('tabUsers').classList.remove('active');
+            } else {
+                document.getElementById('dataView').classList.add('hidden');
+                document.getElementById('usersView').classList.remove('hidden');
+                document.getElementById('tabData').classList.remove('active');
+                document.getElementById('tabUsers').classList.add('active');
+            }
+        }
+
+        // MANAGE USERS FUNCTIONS
+        function createNewUser() {
+            const u = document.getElementById('regUser').value.toLowerCase().trim();
+            const p = document.getElementById('regPass').value;
+            if(!u || !p) return alert("Dono cheezein bharein!");
+            
+            db.ref('app_users/' + u).set({ password: p }).then(() => {
+                alert("User Created!");
+                document.getElementById('regUser').value = "";
+                document.getElementById('regPass').value = "";
+            });
+        }
+
+        function syncUsers() {
+            db.ref('app_users').on('value', snap => {
+                const users = snap.val();
+                const container = document.getElementById('userListContainer');
+                container.innerHTML = "<h4 class='font-bold text-slate-400 text-xs mb-2'>EXISTING USERS</h4>";
+                for(let u in users) {
+                    container.innerHTML += `
+                        <div class="bg-white p-4 rounded-2xl flex justify-between items-center shadow-sm">
+                            <div><p class="font-bold text-slate-700">${u.toUpperCase()}</p><p class="text-xs text-slate-400">Pass: ${users[u].password}</p></div>
+                            <button onclick="deleteUser('${u}')" class="text-red-500 p-2"><i class="fas fa-trash"></i></button>
+                        </div>`;
+                }
+            });
+        }
+
+        function deleteUser(u) {
+            if(confirm("Kya aap is user ko khatam karna chahte hain?")) {
+                db.ref('app_users/' + u).remove();
+            }
+        }
+
+        // PATIENT DATA FUNCTIONS (Pehle jaisa logic)
+        function initSync() {
+            db.ref('omi_audit_data').on('value', snap => {
+                allData = snap.val() || [];
+                render();
+            });
+        }
+
+        function render() {
+            const container = document.getElementById('cardsContainer');
+            const q = document.getElementById('search').value.toUpperCase();
+            container.innerHTML = "";
+            let count = 0;
+            allData.slice(1).forEach((row, index) => {
+                if(row.some(c => (c||"").toString().toUpperCase().includes(q))) {
+                    count++;
+                    const status = (row[row.length - 2] || "").toString().trim().toUpperCase();
+                    let sCls = status === "NOT FILLED" || status === "INCOMPLETE" ? "status-yellow" : (status === "DISCHARGED" ? "status-green" : "");
+                    container.innerHTML += `
+                        <div onclick="showDetail(${index + 1})" class="patient-card ${sCls} bg-white p-5 shadow-sm mb-3">
+                            <h3 class="font-black text-slate-800 text-sm uppercase">${row[2] || 'NAME'}</h3>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase">P: ${row[1]} | R: ${row[4]} | ${status}</p>
+                        </div>`;
+                }
+            });
+            document.getElementById('countTotal').innerText = count;
+        }
+
+        function showDetail(idx) {
+            const row = allData[idx];
+            const headers = allData[0];
+            let html = `<div class="flex justify-between mb-6"><h3 class="font-black">Patient Profile</h3><button onclick="closeModal()"><i class="fas fa-times"></i></button></div><div class="space-y-3">`;
+            headers.forEach((h, i) => {
+                if(row[i]) html += `<div class="bg-slate-50 p-3 rounded-xl"><p class="text-[9px] font-bold text-slate-400 uppercase">${h}</p><p class="text-sm font-semibold">${row[i]}</p></div>`;
+            });
+            html += `</div>`;
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('detailModal').classList.remove('hidden');
+        }
+
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
+        function openAddModal() { alert("Add Patient functionality active!"); } // Isko aap apne purane modal logic se connect kar sakte hain
+    </script>
+</body>
+</html>

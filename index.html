@@ -3,93 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OMI Advanced Portal</title>
+    <title>OMI AUDIT SMART APP</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-database-compat.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        table { border-collapse: collapse; width: 100%; font-size: 11px; }
-        th, td { border: 1px solid #e2e8f0; padding: 12px 8px; text-align: left; white-space: nowrap; }
-        th { background: #f8fafc; position: sticky; top: 0; z-index: 10; color: #475569; }
-        tr:nth-child(even) { background-color: #f1f5f9; }
+        body { font-family: 'Segoe UI', sans-serif; }
+        .patient-card { cursor: pointer; border-radius: 20px; transition: 0.2s; border: 1px solid #f1f5f9; }
+        .status-yellow { border-left: 6px solid #fbbf24; background-color: #fffbeb; }
+        .status-green { border-left: 6px solid #22c55e; background-color: #f0fdf4; }
+        .modal-up { animation: slideUp 0.3s ease-out; border-radius: 30px 30px 0 0; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .fab { position: fixed; bottom: 100px; right: 20px; z-index: 45; }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen font-sans">
+<body class="bg-slate-50">
 
     <div id="loginPage" class="flex items-center justify-center min-h-screen bg-slate-900 p-6">
-        <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-md border border-slate-200">
-            <div class="text-center mb-8">
-                <div class="bg-blue-600 w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-blue-500/50">
-                    <i class="fas fa-hospital-user text-white text-3xl"></i>
-                </div>
-                <h1 class="text-2xl font-black text-slate-800 tracking-tight">OMI PORTAL</h1>
-                <p class="text-slate-400 text-sm">Secure Access Gateway</p>
-            </div>
+        <div class="bg-white p-8 rounded-[32px] shadow-2xl w-full max-w-sm">
+            <h1 class="text-2xl font-black text-center mb-8 italic">OMI AUDIT</h1>
+            <input type="text" id="userID" placeholder="User ID" class="w-full p-4 mb-4 bg-slate-50 rounded-2xl outline-none border">
+            <input type="password" id="userPass" placeholder="Password" class="w-full p-4 mb-6 bg-slate-50 rounded-2xl outline-none border">
+            <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg">Login</button>
+        </div>
+    </div>
 
-            <div class="space-y-4">
-                <div class="relative">
-                    <i class="fas fa-user absolute left-4 top-4 text-slate-400"></i>
-                    <input type="text" id="userID" placeholder="User ID" class="w-full pl-12 p-3.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all">
-                </div>
-                <div class="relative">
-                    <i class="fas fa-lock absolute left-4 top-4 text-slate-400"></i>
-                    <input type="password" id="userPass" placeholder="Password" class="w-full pl-12 p-3.5 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+    <div id="mainPage" class="hidden">
+        <header class="bg-white p-5 sticky top-0 z-40 shadow-sm border-b">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-black">Audit App</h2>
+                <div class="flex gap-2">
+                    <div class="bg-blue-600 px-3 py-1.5 rounded-xl text-center">
+                        <p class="text-[8px] text-white opacity-70">TOTAL</p>
+                        <p id="countTotal" class="text-sm font-black text-white">0</p>
+                    </div>
+                    <div class="bg-green-500 px-3 py-1.5 rounded-xl text-center">
+                        <p class="text-[8px] text-white opacity-70">DISCH</p>
+                        <p id="countDischarged" class="text-sm font-black text-white">0</p>
+                    </div>
                 </div>
             </div>
+            <input type="text" id="search" onkeyup="render()" placeholder="Search..." class="w-full p-3 bg-slate-100 rounded-2xl outline-none text-sm">
+        </header>
 
-            <button onclick="login()" class="w-full bg-blue-600 text-white font-bold py-3.5 rounded-xl mt-6 hover:bg-blue-700 active:scale-95 transition-all shadow-lg">Sign In</button>
-            
-            <div class="flex justify-between mt-6 text-sm">
-                <button onclick="biometricLogin()" class="text-blue-600 font-semibold flex items-center gap-2">
-                    <i class="fas fa-fingerprint text-lg"></i> Biometric
-                </button>
-                <button onclick="forgetPass()" class="text-slate-500 hover:text-blue-600">Forget Password?</button>
+        <div id="cardsContainer" class="p-4 space-y-4 pb-32"></div>
+
+        <button onclick="openAddModal()" class="fab bg-blue-600 text-white w-14 h-14 rounded-full shadow-2xl flex items-center justify-center text-2xl active:scale-90 transition-all">
+            <i class="fas fa-plus"></i>
+        </button>
+
+        <div id="addModal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-end justify-center">
+            <div class="bg-white w-full h-[90vh] modal-up overflow-hidden flex flex-col p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-black">Add New Patient</h3>
+                    <button onclick="closeAddModal()" class="text-slate-400 text-xl"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="space-y-4 overflow-y-auto flex-1 pb-10">
+                    <input type="text" id="newPNo" placeholder="P-Number (e.g. 203568)" class="w-full p-4 bg-slate-50 rounded-2xl border outline-none">
+                    <input type="text" id="newName" placeholder="Patient Name" class="w-full p-4 bg-slate-50 rounded-2xl border outline-none">
+                    <input type="text" id="newRoom" placeholder="Room Number" class="w-full p-4 bg-slate-50 rounded-2xl border outline-none">
+                    <input type="text" id="newPanel" placeholder="Panel Name" class="w-full p-4 bg-slate-50 rounded-2xl border outline-none">
+                    <select id="newStatus" class="w-full p-4 bg-slate-50 rounded-2xl border outline-none">
+                        <option value="PENDING">PENDING</option>
+                        <option value="NOT FILLED">NOT FILLED</option>
+                        <option value="INCOMPLETE">INCOMPLETE</option>
+                        <option value="FILLED">FILLED</option>
+                        <option value="DISCHARGED">DISCHARGED</option>
+                    </select>
+                    <textarea id="newRemarks" placeholder="Remarks" class="w-full p-4 bg-slate-50 rounded-2xl border outline-none h-24"></textarea>
+                    <button onclick="saveNewPatient()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg">Save Patient</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="detailModal" class="hidden fixed inset-0 bg-slate-900/60 z-50 flex items-end justify-center">
+            <div class="bg-white w-full h-[85vh] modal-up overflow-hidden p-6 flex flex-col">
+                <button onclick="closeModal()" class="self-end text-slate-400 mb-2"><i class="fas fa-times text-xl"></i></button>
+                <div id="modalContent" class="overflow-y-auto space-y-3"></div>
             </div>
         </div>
     </div>
 
-    <div id="mainPage" class="hidden animate-in fade-in duration-500">
-        <header class="bg-white border-b border-slate-200 p-4 sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                <h2 class="text-xl font-black text-slate-800 flex items-center gap-2">
-                    <span class="w-2 h-8 bg-blue-600 rounded-full"></span>
-                    PATIENT DATABASE
-                </h2>
-                <div class="relative w-full md:w-80">
-                    <i class="fas fa-search absolute left-3 top-3 text-slate-400"></i>
-                    <input type="text" id="search" onkeyup="render()" placeholder="Search patient name..." class="w-full pl-10 p-2.5 border border-slate-200 rounded-full outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <button onclick="location.reload()" class="bg-slate-100 p-2.5 rounded-full hover:bg-slate-200">
-                    <i class="fas fa-sign-out-alt text-slate-600"></i>
-                </button>
-            </div>
-        </header>
-
-        <main class="max-w-7xl mx-auto p-4 md:p-6">
-            <div class="bg-white shadow-xl rounded-2xl overflow-hidden border border-slate-200">
-                <div class="table-container max-h-[75vh]">
-                    <table id="dataTable">
-                        <thead id="tableHead"></thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <div id="ownerTools" class="hidden mt-8 p-6 bg-white rounded-2xl shadow-lg border-2 border-dashed border-blue-200">
-                <div class="flex items-center gap-3 mb-4">
-                    <i class="fas fa-cloud-upload-alt text-blue-600 text-2xl"></i>
-                    <h3 class="font-bold text-slate-800 text-lg">Update Cloud Data</h3>
-                </div>
-                <textarea id="excelData" placeholder="Excel data yahan paste karen (Ctrl+V)..." class="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl h-40 text-xs mb-4 outline-none focus:bg-white transition-all"></textarea>
-                <button onclick="upload()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30">Sync Now</button>
-            </div>
-        </main>
-    </div>
-
     <script>
-        // FIREBASE SETUP
+        // Firebase Config (Wahi rahegi)
         const firebaseConfig = {
             apiKey: "AIzaSyB60b1DuLBjAHRXV0SqE6U0vf1aTD0UtZ8",
             authDomain: "omi-patient-portal-750f3.firebaseapp.com",
@@ -100,81 +97,92 @@
         const db = firebase.database();
         let allData = [];
 
-        // LOGIN SYSTEM
         function login() {
             const u = document.getElementById('userID').value;
             const p = document.getElementById('userPass').value;
             if((u==='owner' && p==='1234') || (u==='user' && p==='user123')) {
-                enterPortal(u);
-            } else { alert("Invalid Credentials!"); }
-        }
-
-        function enterPortal(role) {
-            document.getElementById('loginPage').classList.add('hidden');
-            document.getElementById('mainPage').classList.remove('hidden');
-            if(role==='owner') document.getElementById('ownerTools').classList.remove('hidden');
-            initSync();
-        }
-
-        // FINGERPRINT (BIOMETRIC)
-        async function biometricLogin() {
-            if (window.PublicKeyCredential) {
-                try {
-                    // Note: Yeh tabhi fully work karega jab apka user pehle se registered ho.
-                    // Filhal hum simulation kar rahe hain device support ki.
-                    alert("Fingerprint Sensor Active... Apni ungli scan karen.");
-                    // Yahan security logic ata hai, demo ke liye hum owner login karwa dete hain
-                    enterPortal('owner');
-                } catch (e) {
-                    alert("Biometric Failed or Not Set up.");
-                }
-            } else {
-                alert("Biometric not supported on this device/browser.");
+                document.getElementById('loginPage').classList.add('hidden');
+                document.getElementById('mainPage').classList.remove('hidden');
+                initSync();
             }
         }
 
-        // FORGET PASSWORD
-        function forgetPass() {
-            const pin = prompt("Security PIN enter karen (Default: 0000):");
-            if(pin === "0000") {
-                alert("Apka Admin Password: 1234\nUser Password: user123");
-            } else {
-                alert("Wrong Security PIN!");
-            }
-        }
-
-        // DATA HANDLERS
         function initSync() {
-            db.ref('omi_full_data').on('value', (snap) => {
+            db.ref('omi_audit_data').on('value', snap => {
                 allData = snap.val() || [];
                 render();
             });
         }
 
-        function upload() {
-            const txt = document.getElementById('excelData').value;
-            if(!txt) return alert("Paste Excel data first!");
-            const rows = txt.trim().split('\n').map(r => r.split('\t'));
-            db.ref('omi_full_data').set(rows).then(() => {
-                alert("Success! " + rows.length + " rows uploaded.");
-                document.getElementById('excelData').value = "";
+        function render() {
+            const container = document.getElementById('cardsContainer');
+            const q = document.getElementById('search').value.toUpperCase();
+            container.innerHTML = "";
+            let t = 0, d = 0;
+
+            allData.slice(1).forEach((row, index) => {
+                const status = (row[row.length - 2] || "").toString().trim().toUpperCase();
+                t++; if(status === "DISCHARGED") d++;
+
+                if(row.some(c => (c||"").toString().toUpperCase().includes(q))) {
+                    let sCls = status === "NOT FILLED" || status === "INCOMPLETE" ? "status-yellow" : (status === "DISCHARGED" ? "status-green" : "");
+                    container.innerHTML += `
+                        <div onclick="showDetail(${index + 1})" class="patient-card ${sCls} bg-white p-5 shadow-sm mb-3">
+                            <h3 class="font-black text-slate-800 text-sm uppercase">${row[2] || 'NAME'}</h3>
+                            <p class="text-[10px] font-bold text-blue-600 uppercase">P: ${row[1]} | R: ${row[4]} | ${status}</p>
+                        </div>`;
+                }
+            });
+            document.getElementById('countTotal').innerText = t;
+            document.getElementById('countDischarged').innerText = d;
+        }
+
+        // --- NEW PATIENT LOGIC ---
+        function openAddModal() { document.getElementById('addModal').classList.remove('hidden'); }
+        function closeAddModal() { document.getElementById('addModal').classList.add('hidden'); }
+
+        function saveNewPatient() {
+            const pno = document.getElementById('newPNo').value;
+            const name = document.getElementById('newName').value;
+            const room = document.getElementById('newRoom').value;
+            const panel = document.getElementById('newPanel').value;
+            const status = document.getElementById('newStatus').value;
+            const remarks = document.getElementById('newRemarks').value;
+
+            if(!pno || !name) return alert("P-Number aur Name zaroori hai!");
+
+            // Naya row banana jo Excel ke structure se match kare
+            const newRow = new Array(allData[0].length).fill("");
+            newRow[0] = allData.length; // S.No
+            newRow[1] = pno;
+            newRow[2] = name;
+            newRow[3] = panel;
+            newRow[4] = room;
+            newRow[newRow.length - 2] = status; // Work Sheet Status
+            newRow[newRow.length - 1] = remarks; // Remarks
+
+            allData.push(newRow);
+            db.ref('omi_audit_data').set(allData).then(() => {
+                alert("Patient Added Successfully!");
+                closeAddModal();
+                // Clear fields
+                document.getElementById('newPNo').value = "";
+                document.getElementById('newName').value = "";
             });
         }
 
-        function render() {
-            const head = document.getElementById('tableHead');
-            const body = document.getElementById('tableBody');
-            const q = document.getElementById('search').value.toUpperCase();
-            head.innerHTML = ""; body.innerHTML = "";
-            if(!allData.length) return;
-
-            head.innerHTML = `<tr>${allData[0].map(h => `<th>${h}</th>`).join('')}</tr>`;
-            for(let i=1; i<allData.length; i++) {
-                if(allData[i].some(cell => cell.toUpperCase().includes(q))) {
-                    body.innerHTML += `<tr>${allData[i].map(c => `<td>${c||'-'}</td>`).join('')}</tr>`;
-                }
-            }
+        function showDetail(idx) {
+            const row = allData[idx];
+            const headers = allData[0];
+            let html = "";
+            headers.forEach((h, i) => {
+                if(row[i]) html += `<div class="bg-slate-50 p-3 rounded-xl"><p class="text-[9px] font-bold text-slate-400 uppercase">${h}</p><p class="text-sm font-semibold">${row[i]}</p></div>`;
+            });
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('detailModal').classList.remove('hidden');
         }
+
+        function closeModal() { document.getElementById('detailModal').classList.add('hidden'); }
     </script>
 </body>
 </html>
